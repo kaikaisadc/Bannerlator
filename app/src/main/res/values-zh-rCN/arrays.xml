@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- zh-CN overlay for arrays whose entries are display labels only
+     (index-based selection or a parallel *Values array handles the value).
+     Arrays that are parsed back as identifiers are intentionally NOT
+     translated here, so they fall back to the English originals. -->
+<resources>
+    <string-array name="startup_selection_entries">
+        <item>标准（加载全部服务）</item>
+        <item>精简（仅加载必要服务）</item>
+        <item>激进（启动时停止服务）</item>
+        <item>自定义（逐个选择服务）</item>
+    </string-array>
+    <string-array name="binding_type_entries">
+        <item>键盘</item>
+        <item>鼠标</item>
+        <item>手柄</item>
+    </string-array>
+    <string-array name="touchscreenInputModesEntries">
+        <item>触摸板</item>
+        <item>模拟触摸屏</item>
+        <item>直接触摸</item>
+    </string-array>
+    <string-array name="transformCapturedPointerEntries">
+        <item>否</item>
+        <item>顺时针</item>
+        <item>逆时针</item>
+        <item>倒置</item>
+        <item>自动（用于触摸板）</item>
+    </string-array>
+</resources>
