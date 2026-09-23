@@ -56,19 +56,11 @@ tasks.register("downloadImageFS") {
 
 // Simplified-Chinese (zh-cn) build-time rewrite. Git sources stay English so upstream merges
 // remain clean; this rewrites display-position string literals from scripts/zh-map.json right
-// before compilation. Skipped when the script is absent (e.g. a non-zh checkout).
-tasks.register("zhRewrite") {
-    def rewriteScript = new File(project.rootDir, ["scripts", "zh-rewrite.py"].join(File.separator))
-    doLast {
-        if (!rewriteScript.exists()) {
-            logger.lifecycle("zhRewrite: scripts/zh-rewrite.py not found, skipping")
-            return
-        }
-        exec {
-            workingDir project.rootDir
-            commandLine "python3", rewriteScript.absolutePath
-        }
-    }
+// before compilation.
+def zhRewriteScript = new File(project.rootDir, ["scripts", "zh-rewrite.py"].join(File.separator))
+tasks.register("zhRewrite", Exec) {
+    workingDir project.rootDir
+    commandLine "python3", zhRewriteScript.absolutePath
 }
 
 tasks.register("prepareKotlinBuildScriptModel"){}
