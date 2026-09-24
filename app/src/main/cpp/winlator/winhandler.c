@@ -6,14 +6,18 @@
 #define _WIN32_WINNT 0x0600
 #endif
 
+#include <winsock2.h>
+#include <windows.h>
 #include <psapi.h>
+#include <shellapi.h>
+#include <tlhelp32.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tlhelp32.h>
-#include <windows.h>
-#include <winsock2.h>
+#include <wchar.h>
 
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #define SERVER_PORT 7946
 #define CLIENT_PORT 7947
@@ -400,6 +404,7 @@ DWORD WINAPI ServerThread(LPVOID lpParam) {
         break;
       case RC_EXEC:
         handleExec(buffer + 5, len - 5);
+        break;
       case RC_KILL_PROCESS:
         handleKillProcess(buffer + 1, len - 1);
         break;
@@ -460,25 +465,32 @@ void handleChildProcesses(int affinityMask) {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                    LPSTR lpCmdLine, int nCmdShow) {
   int affinity = 0;
-  char *directory = NULL;
-  char *executable = "wfm.exe";
-  char *params = NULL;
+  WCHAR *directory = NULL;
+  WCHAR *executable = L"wfm.exe";
+  WCHAR execArgs[4096] = {0};
 
-  // Utilize global __argc and __argv provided by MinGW/CRT
-  int argc = __argc;
-  char **argv = __argv;
+  // Parse the WIDE command line. The previous ANSI __argv path could not represent non-ASCII
+  // without the process's ANSI code page; on a container whose locale never reaches Wine
+  // (Bionic's setlocale reports "C.UTF-8", see winlator/wine_locale.c) that code page is
+  // 1252, so a Chinese folder name arrived as "?" and ShellExecuteExA could not find the
+  // file. CommandLineToArgvW is UTF-16 end to end and independent of the code page, so
+  // Chinese characters and spaces survive. The affinity flag stays parsed here; the default
+  // shell target is still wfm.exe.
+  int argc = 0;
+  LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  if (argv == NULL)
+    return 0;
 
-  // Parse loop (from decompiled logic)
   int argIdx = 1;
   while (argIdx < argc) {
-    if (strcmp(argv[argIdx], "/affinity") == 0) {
+    if (wcscmp(argv[argIdx], L"/affinity") == 0) {
       if (argIdx + 1 < argc) {
-        affinity = (int)strtol(argv[argIdx + 1], NULL, 16);
+        affinity = (int)wcstol(argv[argIdx + 1], NULL, 16);
         argIdx += 2;
       } else {
         argIdx++;
       }
-    } else if (strcmp(argv[argIdx], "/dir") == 0) {
+    } else if (wcscmp(argv[argIdx], L"/dir") == 0) {
       if (argIdx + 1 < argc) {
         directory = argv[argIdx + 1];
         argIdx += 2;
@@ -492,26 +504,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
   }
 
-  char execArgs[2048] = {0};
-  if (argIdx < argc) {
-    for (int i = argIdx; i < argc; i++) {
-      strcat(execArgs, "\"");
-      strcat(execArgs, argv[i]);
-      strcat(execArgs, "\" ");
-    }
+  int argsLen = 0;
+  for (int i = argIdx; i < argc; i++) {
+    size_t len = wcslen(argv[i]);
+    // two quotes + trailing space + NUL
+    if ((size_t)argsLen + len + 4 > ARRAY_SIZE(execArgs)) break;
+    execArgs[argsLen++] = L'"';
+    wmemcpy(execArgs + argsLen, argv[i], len);
+    argsLen += (int)len;
+    execArgs[argsLen++] = L'"';
+    execArgs[argsLen++] = L' ';
+    execArgs[argsLen] = L'\0';
   }
 
-  SHELLEXECUTEINFOA sei = {0};
-  sei.cbSize = sizeof(SHELLEXECUTEINFOA);
+  SHELLEXECUTEINFOW sei = {0};
+  sei.cbSize = sizeof(SHELLEXECUTEINFOW);
   sei.fMask = SEE_MASK_NOCLOSEPROCESS;
   sei.lpFile = executable;
   sei.lpParameters = execArgs[0] ? execArgs : NULL;
   sei.lpDirectory = directory;
   sei.nShow = SW_SHOW;
 
-  ShellExecuteExA(&sei);
+  ShellExecuteExW(&sei);
   if (sei.hProcess)
     CloseHandle(sei.hProcess);
+
+  LocalFree(argv);
 
   HANDLE hThread = CreateThread(NULL, 0, ServerThread, NULL, 0, NULL);
 

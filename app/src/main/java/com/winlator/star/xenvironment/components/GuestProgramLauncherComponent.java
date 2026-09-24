@@ -534,6 +534,28 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             ld_preload += fakeinputDest.getAbsolutePath();
         }
 
+        // Locale shim (see winlator/wine_locale.c). Bionic setlocale() reports "C.UTF-8", so
+        // Wine's ntdll never takes its $LC_ALL fallback and the Windows ANSI code page stays
+        // 1252: the container's LC_ALL=zh_CN.UTF-8 is ignored and Chinese (game text, a GBK
+        // .txt, an ANSI file path) renders as "?"/mojibake even with CJK fonts installed.
+        // Reporting "C" makes Wine read $LC_ALL itself → zh-CN → ACP 936. Copied into the
+        // imagefs like libfakeinput.so so it resolves inside the guest mount namespace.
+        File wineLocaleDest = new File(imageFs.getLibDir(), "libwine_locale.so");
+        File wineLocaleSrc = new File(nativeLibDir, "libwine_locale.so");
+        try {
+            if (wineLocaleSrc.exists()) {
+                FileUtils.copy(wineLocaleSrc, wineLocaleDest);
+            } else if (!wineLocaleDest.exists()) {
+                Log.e("GuestLauncher", "libwine_locale.so NOT FOUND in APK: " + wineLocaleSrc.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            Log.e("GuestLauncher", "Failed to copy libwine_locale.so: " + e.getMessage());
+        }
+        if (wineLocaleDest.exists()) {
+            if (!ld_preload.isEmpty()) ld_preload += ":";
+            ld_preload += wineLocaleDest.getAbsolutePath();
+        }
+
         File devInputDir = new File(imageFs.getRootDir(), "dev/input");
         devInputDir.mkdirs();
         File event0 = new File(devInputDir, "event0");

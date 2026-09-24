@@ -80,6 +80,23 @@ target_link_libraries(fakeinput
         dl
 )
 
+# Bionic locale shim (loaded via LD_PRELOAD into the box64/wine process). Android's libc has
+# no real locales: setlocale() reports "C.UTF-8", so Wine's ntdll never takes its $LC_ALL
+# fallback and the Windows ANSI code page stays 1252 — a container's LC_ALL=zh_CN.UTF-8 is
+# ignored and Chinese text/GBK .txt/ANSI paths come out as "?"/mojibake even when CJK fonts
+# are installed. Reporting the classic "C" makes Wine read $LC_ALL itself → zh-CN → ACP 936.
+# NOTE: no -fvisibility=hidden here — setlocale() MUST stay exported to interpose Bionic's.
+add_library(wine_locale SHARED
+        winlator/wine_locale.c
+)
+
+target_compile_options(wine_locale PRIVATE -Wall -Wextra)
+
+target_link_libraries(wine_locale
+        log
+        dl
+)
+
 add_library(vulkan_renderer SHARED
         winlator/vulkan_jni.cpp
         winlator/VulkanRendererContext.cpp

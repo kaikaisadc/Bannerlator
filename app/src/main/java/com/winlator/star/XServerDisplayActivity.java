@@ -7125,7 +7125,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     //                module-aaudio-sink (performance_mode/adaptive/buffer modargs). MUST bump so
     //                existing containers re-extract it — vc is frozen, so without this the old module
     //                lingers and the new default.pa args are rejected → silence (2026-08-10).
-    private static final String PATTERN_CONTENT_VERSION = "7";
+    //          "8" = winhandler.exe rebuilt with a WIDE command line (CommandLineToArgvW +
+    //                ShellExecuteExW). The old ANSI build could not carry a non-ASCII path when
+    //                the container's locale never reaches Wine (Bionic setlocale), so an .exe in a
+    //                Chinese-named / spaced folder failed to launch. MUST bump so existing containers
+    //                re-extract the new exe (2026-08-20).
+    private static final String PATTERN_CONTENT_VERSION = "8";
 
     private void setupWineSystemFiles() {
         String appVersion = String.valueOf(AppUtils.getVersionCode(this));
